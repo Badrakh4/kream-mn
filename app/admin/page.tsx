@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 
 import { ORDER_STATUSES, type OrderRequest, type OrderStatus } from "@/lib/order-requests";
 import { supabase } from "@/lib/supabase";
+import AdminLogoutButton from "./AdminLogoutButton";
 
 const statusStyles: Record<OrderStatus, string> = {
   pending: "border-amber-400/30 bg-amber-400/10 text-amber-300",
@@ -49,7 +50,7 @@ export default function AdminPage() {
 
   return (
     <main className="min-h-screen bg-[#050505] text-[#f5f5f0]">
-      <header className="border-b border-white/10 bg-[#050505]"><div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12"><Link className="flex items-center gap-3 text-[17px] font-extrabold tracking-[0.16em]" href="/" aria-label="KREAM.MN home"><span className="grid h-9 w-9 place-items-center border border-[#d7ff3f] text-[#d7ff3f]">K</span><span>KREAM<span className="text-[#d7ff3f]">.</span>MN</span></Link><div className="flex items-center gap-5"><Link className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-[#d7ff3f]" href="/admin/products">Products</Link><Link className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-[#d7ff3f]" href="/">← Marketplace</Link></div></div></header>
+      <header className="border-b border-white/10 bg-[#050505]"><div className="mx-auto flex h-[76px] max-w-[1440px] items-center justify-between px-5 sm:px-8 lg:px-12"><Link className="flex items-center gap-3 text-[17px] font-extrabold tracking-[0.16em]" href="/" aria-label="KREAM.MN home"><span className="grid h-9 w-9 place-items-center border border-[#d7ff3f] text-[#d7ff3f]">K</span><span>KREAM<span className="text-[#d7ff3f]">.</span>MN</span></Link><div className="flex items-center gap-5"><Link className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-[#d7ff3f]" href="/admin/products">Products</Link><Link className="text-xs font-semibold uppercase tracking-[0.16em] text-white/50 transition-colors hover:text-[#d7ff3f]" href="/">← Marketplace</Link><AdminLogoutButton /></div></div></header>
 
       <div className="mx-auto max-w-[1440px] px-5 py-10 sm:px-8 lg:px-12 lg:py-16">
         <div className="flex flex-col justify-between gap-6 border-b border-white/10 pb-8 sm:flex-row sm:items-end"><div><p className="mb-3 text-xs font-bold uppercase tracking-[0.24em] text-[#d7ff3f]">KREAM.MN / Admin</p><h1 className="text-4xl font-bold tracking-[-0.04em] sm:text-6xl">Order requests</h1><p className="mt-4 text-sm text-white/45">Manage customer requests and fulfillment status.</p></div><span className="border border-white/10 bg-[#0c0c0c] px-4 py-3 text-xs font-semibold uppercase tracking-[0.14em] text-white/55">{requests.length} total requests</span></div>
