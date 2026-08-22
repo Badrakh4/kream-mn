@@ -19,7 +19,7 @@ export default async function Home() {
             <Link className="transition-colors hover:text-[#d7ff3f]" href="#about">About</Link>
           </div>
           <div className="flex items-center gap-3">
-            <Link className="rounded-full bg-[#d7ff3f] px-4 py-2.5 text-xs font-bold tracking-[0.08em] text-black transition-colors hover:bg-white" href="#login">Login</Link>
+            <Link className="rounded-full bg-[#d7ff3f] px-4 py-2.5 text-xs font-bold tracking-[0.08em] text-black transition-colors hover:bg-white" href="/admin/login">Login</Link>
             <details className="relative lg:hidden">
               <summary aria-label="Open navigation menu" className="grid h-10 w-10 cursor-pointer list-none place-items-center border border-white/15 text-lg marker:hidden">☰</summary>
               <div className="absolute right-0 top-12 w-52 border border-white/15 bg-[#111] p-2 shadow-2xl">
@@ -65,7 +65,7 @@ export default async function Home() {
 
       <section id="about" className="mx-auto grid max-w-[1440px] gap-10 px-5 py-20 sm:px-8 md:grid-cols-[1fr_1.4fr] md:items-end lg:px-12 lg:py-28"><p className="text-xs font-bold uppercase tracking-[0.24em] text-[#d7ff3f]">03 / About KREAM.MN</p><div><h2 className="max-w-3xl text-4xl font-bold leading-none tracking-[-0.04em] sm:text-6xl">The culture is in the details.</h2><p className="mt-6 max-w-xl text-base leading-7 text-white/50">Pair бүрийг шалгаж, үнэ цэнийг нь хамгаалж, sneaker culture-д дуртай хүмүүстэй холбодог.</p></div></section>
 
-      <footer className="border-t border-white/10 bg-[#d7ff3f] text-black"><div className="mx-auto max-w-[1440px] px-5 py-12 sm:px-8 lg:px-12"><div className="flex flex-col justify-between gap-12 md:flex-row md:items-end"><div><p className="text-3xl font-extrabold tracking-[0.12em]">KREAM<span className="text-white">.</span>MN</p><p className="mt-3 max-w-xs text-sm leading-6 text-black/60">The home of sneakers in Mongolia.</p></div><div className="text-sm leading-7 text-black/65"><p>hello@kream.mn</p><p>+976 9900 2026</p><p>Ulaanbaatar, Mongolia</p></div></div><div className="mt-16 border-t border-black/15 pt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/50">© 2026 KREAM.MN</div></div></footer>
+      <footer className="border-t border-white/10 bg-[#d7ff3f] text-black"><div className="mx-auto max-w-[1440px] px-5 py-12 sm:px-8 lg:px-12"><div className="flex flex-col justify-between gap-12 md:flex-row md:items-end"><div><p className="text-3xl font-extrabold tracking-[0.12em]">KREAM<span className="text-white">.</span>MN</p><p className="mt-3 max-w-xs text-sm leading-6 text-black/60">The home of sneakers in Mongolia.</p></div><div className="text-sm leading-7 text-black/65"><p>hello@kream.mn</p><p>+976 9900 7930</p><p>Ulaanbaatar, Mongolia</p></div></div><div className="mt-16 border-t border-black/15 pt-5 text-[10px] font-semibold uppercase tracking-[0.16em] text-black/50">© 2026 KREAM.MN</div></div></footer>
     </main>
   );
 }
