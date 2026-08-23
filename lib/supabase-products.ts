@@ -8,6 +8,15 @@ export type SupabaseProduct = {
   price: number;
   image_url: string | null;
   description?: string | null;
+  source_url?: string | null;
+  source_name?: string | null;
+  source_product_id?: string | null;
+  price_krw?: number | null;
+  exchange_rate?: number | null;
+  exchange_rate_date?: string | null;
+  imported_at?: string | null;
+  last_synced_at?: string | null;
+  import_status?: string | null;
 };
 
 function createServerSupabaseClient() {
