@@ -3,6 +3,7 @@ import Image from "next/image";
 
 import { formatProductPrice, getSupabaseProducts, type SupabaseProduct } from "@/lib/supabase-products";
 
+export const dynamic = "force-dynamic";
 export default async function Home() {
   const { products: featuredProducts, error } = await getSupabaseProducts();
   return (
