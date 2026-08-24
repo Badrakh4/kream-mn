@@ -20,11 +20,28 @@ function normalize(value: unknown) {
 
 function metaContent(source: string, key: string) {
   const tags = source.match(/<meta\b[^>]*>/gi) ?? [];
+
   for (const tag of tags) {
-    const keyMatch = tag.match(/\b(?:property|name|itemprop)\s*=\s*["']([^"']+)["']/i);
-    const contentMatch = tag.match(/\bcontent\s*=\s*["']([^"']*)["']/i);
-    if (keyMatch?.[1].toLowerCase() === key.toLowerCase() && contentMatch) return normalize(contentMatch[1]);
+    const keyMatch = tag.match(
+      /\b(?:property|name|itemprop)\s*=\s*[^"']+["']/i
+    );
+
+    const contentMatch = tag.match(
+      /\bcontent\s*=\s*[^"']*["']/i
+    );
+
+    if (!keyMatch || !contentMatch) continue;
+
+    const metaKey = keyMatch[1].toLowerCase();
+
+    if (
+      metaKey === key.toLowerCase() ||
+      (key === "kream:product_name_ko" && metaKey === "name_ko")
+    ) {
+      return normalize(contentMatch[1]);
+    }
   }
+
   return "";
 }
 
