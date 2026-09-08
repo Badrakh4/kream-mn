@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 
 const allowedHosts = new Set(["kream.co.kr", "www.kream.co.kr"]);
 const requestTimeoutMs = 30000;
-const requiredFields = ["korean_product_name", "product_name", "brand", "model_number", "original_price_krw", "image_url"] as const;
+const requiredFields = ["korean_product_name", "product_name", "brand", "model_number", "original_price_krw", "current_price_krw", "image_url"] as const;
 type ProductField = typeof requiredFields[number];
 type Product = Partial<Record<ProductField, string>>;
 
@@ -54,16 +54,30 @@ function nestedValue(value: unknown, keys: string[]) {
   return "";
 }
 
+function parseKrwAmount(value: string) {
+  const amount = value.replace(/[₩원,\s]/g, "");
+  return /^\d+$/.test(amount) && Number.isSafeInteger(Number(amount)) ? amount : "";
+}
+
+function labeledPrice(source: string, labels: string[]) {
+  const text = source.replace(/<[^>]+>/g, " ").replace(/\s+/g, " ");
+  const labelPattern = labels.join("|");
+  const match = text.match(new RegExp(`(?:${labelPattern})\\s*[:：]?\\s*(?:약\\s*)?([0-9]{1,3}(?:,[0-9]{3})*|\\d+)\\s*원?`, "i"));
+  return match ? parseKrwAmount(match[1]) : "";
+}
+
 function productFromObject(value: unknown): Product {
   if (!value || typeof value !== "object") return {};
   const object = value as Record<string, unknown>;
   const brandValue = object.brand;
   const imageValue = object.image ?? object.image_url ?? object.imageUrl;
+  const priceValue = object.price;
   return {
     product_name: nestedValue(object, ["name", "product_name", "productName", "title"]),
     brand: typeof brandValue === "string" ? normalize(brandValue) : nestedValue(brandValue, ["name", "title"]),
     model_number: nestedValue(object, ["sku", "model", "model_number", "modelNumber", "style_code", "styleCode"]),
-    original_price_krw: nestedValue(object, ["price", "original_price_krw", "originalPriceKrw", "amount"]),
+    original_price_krw: nestedValue(object, ["release_price", "releasePrice", "retail_price", "retailPrice", "original_price_krw", "originalPriceKrw"]),
+    current_price_krw: nestedValue(object, ["current_price_krw", "currentPriceKrw", "market_price", "marketPrice", "sale_price", "salePrice", "price"]) || nestedValue(priceValue, ["current", "market", "sale", "amount"]),
     image_url: Array.isArray(imageValue) ? normalize(imageValue[0]) : normalize(imageValue),
     korean_product_name: nestedValue(object, ["korean_product_name", "koreanProductName", "name_ko", "nameKo", "title_ko", "titleKo"]),
   };
@@ -97,7 +111,7 @@ function extractJsonLd(source: string) {
 
 function extractEmbeddedState(source: string) {
   const productValues: Product[] = [];
-  const keyPattern = "(?:name|product_name|productName|title|brand|sku|model|model_number|modelNumber|style_code|styleCode|price|original_price_krw|originalPriceKrw|image|image_url|imageUrl|korean_product_name|koreanProductName|name_ko|nameKo|title_ko|titleKo)";
+  const keyPattern = "(?:name|product_name|productName|title|brand|sku|model|model_number|modelNumber|style_code|styleCode|price|release_price|releasePrice|retail_price|retailPrice|current_price_krw|currentPriceKrw|market_price|marketPrice|sale_price|salePrice|original_price_krw|originalPriceKrw|image|image_url|imageUrl|korean_product_name|koreanProductName|name_ko|nameKo|title_ko|titleKo)";
   const objectPattern = new RegExp(`\\{[^{}]{0,5000}\\b${keyPattern}\\b[^{}]{0,5000}\\}`, "gi");
   for (const match of source.matchAll(objectPattern)) {
     try {
@@ -116,7 +130,8 @@ function extractProduct(source: string) {
     korean_product_name: metaContent(source, "kream:product_name_ko") || metaContent(source, "product:name:ko") || metaContent(source, "name_ko"),
     brand: metaContent(source, "brand") || metaContent(source, "product:brand"),
     model_number: metaContent(source, "sku") || metaContent(source, "product:sku") || metaContent(source, "product:model"),
-    original_price_krw: metaContent(source, "product:price:amount") || metaContent(source, "price"),
+    original_price_krw: labeledPrice(source, ["발매가", "출시가", "정가"]) || metaContent(source, "product:price:original") || metaContent(source, "product:price:retail"),
+    current_price_krw: metaContent(source, "product:price:amount") || metaContent(source, "price"),
   };
   const product = mergeProduct(openGraph, standardMetadata, extractJsonLd(source), extractEmbeddedState(source));
   return { product, missingFields: requiredFields.filter((field) => !product[field]) };

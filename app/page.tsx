@@ -1,7 +1,7 @@
 import Link from "next/link";
 import Image from "next/image";
 
-import { formatProductPrice, getSupabaseProducts, type SupabaseProduct } from "@/lib/supabase-products";
+import { formatProductDiscount, formatProductPrice, getSupabaseProducts, type SupabaseProduct } from "@/lib/supabase-products";
 
 export const dynamic = "force-dynamic";
 export default async function Home() {
@@ -74,6 +74,7 @@ export default async function Home() {
 
 function ProductCard({ product }: { product: SupabaseProduct }) {
   const imageUrl = product.image_url?.trim();
+  const discount = formatProductDiscount(product);
 
-  return <Link href={`/products/${product.id}`} className="group block"><div className="relative mb-4 aspect-[4/5] overflow-hidden bg-gradient-to-br from-[#d6d0c7] via-[#65635f] to-[#171717]">{imageUrl && <Image alt={`${product.brand} ${product.name}`} className="object-cover" fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" src={imageUrl} />}<div className="absolute inset-0 bg-black/20 transition-colors group-hover:bg-black/5" /><span className="absolute left-3 top-3 bg-[#d7ff3f] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-black">Verified</span><span className="absolute bottom-4 right-4 text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">KREAM / {product.id}</span></div><div className="flex items-start justify-between gap-3"><div><p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">{product.brand}</p><h3 className="text-sm font-semibold transition-colors group-hover:text-[#d7ff3f]">{product.name}</h3></div><p className="shrink-0 text-sm font-bold text-[#d7ff3f]">{formatProductPrice(product.price)}</p></div></Link>;
+  return <Link href={`/products/${product.id}`} className="group block"><div className="relative mb-4 aspect-[4/5] overflow-hidden bg-gradient-to-br from-[#d6d0c7] via-[#65635f] to-[#171717]">{imageUrl && <Image alt={`${product.brand} ${product.name}`} className="object-cover" fill sizes="(max-width: 640px) 100vw, (max-width: 1024px) 50vw, 33vw" src={imageUrl} />}<div className="absolute inset-0 bg-black/20 transition-colors group-hover:bg-black/5" /><span className="absolute left-3 top-3 bg-[#d7ff3f] px-2 py-1 text-[9px] font-bold uppercase tracking-[0.16em] text-black">Verified</span><span className="absolute bottom-4 right-4 text-[10px] font-bold uppercase tracking-[0.14em] text-white/70">KREAM / {product.id}</span></div><div className="flex items-start justify-between gap-3"><div><p className="mb-1 text-[10px] font-bold uppercase tracking-[0.16em] text-white/40">{product.brand}</p><h3 className="text-sm font-semibold transition-colors group-hover:text-[#d7ff3f]">{product.name}</h3></div><div className="flex shrink-0 items-center gap-2"><p className="text-sm font-bold text-[#d7ff3f]">{formatProductPrice(product.price)}</p>{discount && <span className="bg-red-500 px-1.5 py-0.5 text-xs font-bold text-white">{discount}</span>}</div></div></Link>;
 }

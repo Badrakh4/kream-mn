@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { ClipboardEvent, FormEvent, useEffect, useState } from "react";
 
 import { supabase } from "@/lib/supabase";
-import { formatProductPrice, type SupabaseProduct } from "@/lib/supabase-products";
+import { formatProductPrice, type ProductSize, type SupabaseProduct } from "@/lib/supabase-products";
 import AdminLogoutButton from "../AdminLogoutButton";
 
 type ProductForm = Pick<SupabaseProduct, "brand" | "name"> & { price: string; image_url: string };
@@ -17,6 +17,7 @@ type ImportForm = {
   brand: string;
   model_number: string;
   price_krw: string;
+  current_price_krw: string;
   exchange_rate: string;
   exchange_rate_date: string;
   image_url: string;
@@ -31,6 +32,7 @@ const emptyImportForm: ImportForm = {
   brand: "",
   model_number: "",
   price_krw: "",
+  current_price_krw: "",
   exchange_rate: "",
   exchange_rate_date: new Date().toISOString().slice(0, 10),
   image_url: "",
@@ -40,6 +42,9 @@ const emptyImportForm: ImportForm = {
 export default function ProductManagementPage() {
   const router = useRouter();
   const [products, setProducts] = useState<SupabaseProduct[]>([]);
+  const [sizes, setSizes] = useState<ProductSize[]>([]);
+  const [sizeProductId, setSizeProductId] = useState<number | null>(null);
+  const [sizeForm, setSizeForm] = useState({ size: "", price_krw: "" });
   const [form, setForm] = useState<ProductForm>(emptyForm);
   const [importForm, setImportForm] = useState<ImportForm>(emptyImportForm);
   const [confirmImport, setConfirmImport] = useState(false);
@@ -58,6 +63,12 @@ export default function ProductManagementPage() {
         setProducts([]);
       } else {
         setProducts((data ?? []) as SupabaseProduct[]);
+        const { data: sizeData, error: sizeError } = await supabase.from("product_sizes").select("*").order("size", { ascending: true });
+        if (sizeError) {
+          console.error("Supabase product sizes query failed:", sizeError);
+        } else {
+          setSizes((sizeData ?? []) as ProductSize[]);
+        }
       }
       setLoaded(true);
     }, 0);
@@ -112,6 +123,7 @@ export default function ProductManagementPage() {
       brand: importForm.brand.trim(),
       model_number: importForm.model_number.trim(),
       price_krw: importForm.price_krw.trim(),
+      current_price_krw: importForm.current_price_krw.trim(),
       exchange_rate: importForm.exchange_rate.trim(),
       exchange_rate_date: importForm.exchange_rate_date.trim(),
       image_url: importForm.image_url.trim(),
@@ -127,10 +139,11 @@ export default function ProductManagementPage() {
     }
 
     const priceKrw = Number(values.price_krw);
+    const currentPriceKrw = Number(values.current_price_krw);
     const exchangeRate = Number(values.exchange_rate);
-    const calculatedMntPrice = Math.round(priceKrw * exchangeRate);
-    if (sourceUrl.protocol !== "https:" || !/^\d+$/.test(values.price_krw) || !Number.isSafeInteger(priceKrw) || priceKrw <= 0) {
-      setError("Source URL must use HTTPS and original price must be a positive integer.");
+    const calculatedMntPrice = Math.round(currentPriceKrw * exchangeRate);
+    if (sourceUrl.protocol !== "https:" || !/^\d+$/.test(values.price_krw) || !Number.isSafeInteger(priceKrw) || priceKrw <= 0 || !/^\d+$/.test(values.current_price_krw) || !Number.isSafeInteger(currentPriceKrw) || currentPriceKrw <= 0) {
+      setError("Source URL must use HTTPS and both prices must be positive integers.");
       return;
     }
     if (!Number.isFinite(exchangeRate) || exchangeRate <= 0) {
@@ -159,6 +172,7 @@ export default function ProductManagementPage() {
       source_name: "KREAM",
       source_product_id: values.model_number,
       price_krw: priceKrw,
+      current_price_krw: currentPriceKrw,
       exchange_rate: exchangeRate,
       exchange_rate_date: values.exchange_rate_date,
       imported_at: new Date().toISOString(),
@@ -194,7 +208,7 @@ export default function ProductManagementPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ source_url: parsedUrl.toString() }),
       });
-      const result = await response.json() as { product?: { korean_product_name?: string; product_name?: string; brand?: string; model_number?: string; original_price_krw?: string; image_url?: string }; missingFields?: string[]; error?: string };
+      const result = await response.json() as { product?: { korean_product_name?: string; product_name?: string; brand?: string; model_number?: string; original_price_krw?: string; current_price_krw?: string; image_url?: string }; missingFields?: string[]; error?: string };
       if (!response.ok || !result.product) {
         setParseMessage(result.error || "Parsing failed. Enter the values manually.");
         return;
@@ -207,6 +221,7 @@ export default function ProductManagementPage() {
         brand: result.product?.brand || current.brand,
         model_number: result.product?.model_number || current.model_number,
         price_krw: result.product?.original_price_krw || current.price_krw,
+        current_price_krw: result.product?.current_price_krw || current.current_price_krw,
 
         exchange_rate: current.exchange_rate || "2.6",
         exchange_rate_date:
@@ -230,6 +245,36 @@ export default function ProductManagementPage() {
   function editProduct(product: SupabaseProduct) {
     setEditingId(product.id);
     setForm({ brand: product.brand, name: product.name, price: formatProductPrice(product.price), image_url: product.image_url ?? "" });
+  }
+
+  async function saveSize(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (!sizeProductId) return;
+    const size = sizeForm.size.trim();
+    const priceKrw = Number(sizeForm.price_krw);
+    if (!size || !Number.isSafeInteger(priceKrw) || priceKrw <= 0) {
+      setError("Size and a positive KRW price are required.");
+      return;
+    }
+
+    const { data, error: sizeError } = await supabase.from("product_sizes").upsert({ product_id: sizeProductId, size, price_krw: priceKrw }, { onConflict: "product_id,size" }).select().single();
+    if (sizeError) {
+      console.error("Supabase product size save failed:", sizeError);
+      setError(sizeError.message || "Unable to save product size.");
+      return;
+    }
+    setSizes((current) => [...current.filter((item) => item.id !== (data as ProductSize).id && !(item.product_id === sizeProductId && item.size === size)), data as ProductSize]);
+    setSizeForm({ size: "", price_krw: "" });
+    setError("");
+  }
+
+  async function deleteSize(id: number) {
+    const { error: sizeError } = await supabase.from("product_sizes").delete().eq("id", id);
+    if (sizeError) {
+      setError(sizeError.message || "Unable to delete product size.");
+      return;
+    }
+    setSizes((current) => current.filter((item) => item.id !== id));
   }
 
   async function deleteProduct(id: number) {
@@ -263,7 +308,8 @@ export default function ProductManagementPage() {
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Product name</span><input required value={importForm.name} onChange={(event) => setImportForm({ ...importForm, name: event.target.value })} type="text" placeholder="Air Jordan 1 Retro High" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Brand</span><input required value={importForm.brand} onChange={(event) => setImportForm({ ...importForm, brand: event.target.value })} type="text" placeholder="Nike" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Model number</span><input required value={importForm.model_number} onChange={(event) => setImportForm({ ...importForm, model_number: event.target.value })} type="text" placeholder="DZ5485-042" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
-              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Original price in KRW</span><input required min="1" step="1" value={importForm.price_krw} onChange={(event) => setImportForm({ ...importForm, price_krw: event.target.value })} type="number" placeholder="189000" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
+              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Release price in KRW</span><input required min="1" step="1" value={importForm.price_krw} onChange={(event) => setImportForm({ ...importForm, price_krw: event.target.value })} type="number" placeholder="288000" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
+              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Current market price in KRW</span><input required min="1" step="1" value={importForm.current_price_krw} onChange={(event) => setImportForm({ ...importForm, current_price_krw: event.target.value })} type="number" placeholder="206000" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">KRW to MNT exchange rate</span><input required min="0.000001" step="any" value={importForm.exchange_rate} onChange={(event) => setImportForm({ ...importForm, exchange_rate: event.target.value })} type="number" placeholder="2.6" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Exchange rate date</span><input required value={importForm.exchange_rate_date} onChange={(event) => setImportForm({ ...importForm, exchange_rate_date: event.target.value })} type="date" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none focus:border-[#d7ff3f]" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Image URL</span><input value={importForm.image_url} onChange={(event) => setImportForm({ ...importForm, image_url: event.target.value })} type="url" placeholder="Optional HTTPS image URL" className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
@@ -278,9 +324,10 @@ export default function ProductManagementPage() {
                 <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Product / brand</dt><dd className="mt-1 text-white/80">{importForm.name || "—"} {importForm.brand && `· ${importForm.brand}`}</dd></div>
                 <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Source product ID</dt><dd className="mt-1 text-white/80">{importForm.model_number || "—"}</dd></div>
                 <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Model number</dt><dd className="mt-1 text-white/80">{importForm.model_number || "—"}</dd></div>
-                <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Original price</dt><dd className="mt-1 text-white/80">{importForm.price_krw ? `${Number(importForm.price_krw).toLocaleString("en-US")} KRW` : "—"}</dd></div>
+                <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Release price</dt><dd className="mt-1 text-white/80">{importForm.price_krw ? `${Number(importForm.price_krw).toLocaleString("en-US")} KRW` : "—"}</dd></div>
+                <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Current market price</dt><dd className="mt-1 text-white/80">{importForm.current_price_krw ? `${Number(importForm.current_price_krw).toLocaleString("en-US")} KRW` : "—"}</dd></div>
                 <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Exchange rate / date</dt><dd className="mt-1 text-white/80">{importForm.exchange_rate || "—"} {importForm.exchange_rate_date && `· ${importForm.exchange_rate_date}`}</dd></div>
-                <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Calculated MNT price</dt><dd className="mt-1 text-lg font-bold text-[#d7ff3f]">{Number.isFinite(Number(importForm.price_krw) * Number(importForm.exchange_rate)) ? `₮ ${Math.round(Number(importForm.price_krw) * Number(importForm.exchange_rate)).toLocaleString("en-US")}` : "—"}</dd></div>
+                <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Calculated MNT price</dt><dd className="mt-1 text-lg font-bold text-[#d7ff3f]">{Number.isFinite(Number(importForm.current_price_krw) * Number(importForm.exchange_rate)) ? `₮ ${Math.round(Number(importForm.current_price_krw) * Number(importForm.exchange_rate)).toLocaleString("en-US")}` : "—"}</dd></div>
                 <div><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Import status</dt><dd className="mt-1 text-white/80">{importForm.import_status || "—"}</dd></div>
                 <div className="sm:col-span-2"><dt className="text-xs uppercase tracking-[0.12em] text-white/35">Image URL</dt><dd className="mt-1 break-all text-white/80">{importForm.image_url || "No image URL"}</dd></div>
               </dl>
@@ -290,6 +337,17 @@ export default function ProductManagementPage() {
             {error && <p className="text-sm text-red-300" role="alert">{error}</p>}
             <button className="flex h-12 w-full items-center justify-center bg-[#d7ff3f] text-xs font-bold uppercase tracking-[0.14em] text-black transition-colors hover:bg-white" type="submit">Confirm and import product</button>
           </form>
+        </section>
+
+        <section className="mt-8 border border-white/10 bg-[#0c0c0c] p-6">
+          <div className="border-b border-white/10 pb-5"><p className="text-xs font-bold uppercase tracking-[0.2em] text-[#d7ff3f]">Size pricing</p><h2 className="mt-2 text-2xl font-semibold">Manage product sizes</h2><p className="mt-2 text-sm text-white/45">Add or edit the KRW price for each available size.</p></div>
+          <div className="mt-6 grid gap-6 lg:grid-cols-[280px_1fr]">
+            <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Product</span><select value={sizeProductId ?? ""} onChange={(event) => { setSizeProductId(event.target.value ? Number(event.target.value) : null); setSizeForm({ size: "", price_krw: "" }); }} className="h-12 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none focus:border-[#d7ff3f]"><option className="bg-[#0c0c0c]" value="">Select product</option>{products.map((product) => <option className="bg-[#0c0c0c]" key={product.id} value={product.id}>{product.brand} / {product.name}</option>)}</select></label>
+            <div>
+              <form className="flex flex-col gap-3 sm:flex-row" onSubmit={saveSize}><input required aria-label="Size" value={sizeForm.size} onChange={(event) => setSizeForm({ ...sizeForm, size: event.target.value })} placeholder="EU 42" className="h-12 flex-1 border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /><input required aria-label="Size price in KRW" min="1" step="1" value={sizeForm.price_krw} onChange={(event) => setSizeForm({ ...sizeForm, price_krw: event.target.value })} type="number" placeholder="206000 KRW" className="h-12 flex-1 border border-white/15 bg-black px-4 text-sm text-white outline-none placeholder:text-white/30 focus:border-[#d7ff3f]" /><button className="h-12 bg-[#d7ff3f] px-6 text-xs font-bold uppercase tracking-[0.12em] text-black disabled:cursor-not-allowed disabled:opacity-40" disabled={!sizeProductId} type="submit">Save size</button></form>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">{sizes.filter((item) => item.product_id === sizeProductId).map((item) => <div className="flex items-center justify-between border border-white/10 bg-black/40 px-4 py-3" key={item.id}><span className="text-sm">{item.size} <span className="text-white/45">· {item.price_krw.toLocaleString("en-US")} KRW</span></span><span className="flex gap-3"><button className="text-xs font-bold uppercase text-[#d7ff3f]" type="button" onClick={() => setSizeForm({ size: item.size, price_krw: String(item.price_krw) })}>Edit</button><button className="text-xs font-bold uppercase text-red-300" type="button" onClick={() => deleteSize(item.id)}>Delete</button></span></div>)}</div>
+            </div>
+          </div>
         </section>
 
         <div className="mt-8 grid gap-8 lg:grid-cols-[360px_1fr]">

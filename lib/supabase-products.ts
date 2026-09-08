@@ -12,11 +12,21 @@ export type SupabaseProduct = {
   source_name?: string | null;
   source_product_id?: string | null;
   price_krw?: number | null;
+  current_price_krw?: number | null;
   exchange_rate?: number | null;
   exchange_rate_date?: string | null;
   imported_at?: string | null;
   last_synced_at?: string | null;
   import_status?: string | null;
+  sizes?: ProductSize[];
+};
+
+export type ProductSize = {
+  id: number;
+  product_id: number;
+  size: string;
+  price_krw: number;
+  created_at?: string;
 };
 
 function createServerSupabaseClient() {
@@ -44,16 +54,27 @@ export async function getSupabaseProducts() {
 
 export async function getSupabaseProduct(id: number) {
   const supabase = createServerSupabaseClient();
-  const { data, error } = await supabase.from("products").select("*").eq("id", id).single();
+  const { data, error } = await supabase.from("products").select("*, product_sizes(*)").eq("id", id).single();
 
   if (error) {
     console.error("Supabase product detail query failed:", { id, error });
     return null;
   }
 
-  return data as SupabaseProduct;
+  const productData = data as SupabaseProduct & { product_sizes?: ProductSize[] };
+  const { product_sizes: productSizes = [], ...product } = productData;
+  const sizes = [...productSizes].sort((left, right) => left.size.localeCompare(right.size, undefined, { numeric: true }));
+
+  return { ...product, sizes };
 }
 
 export function formatProductPrice(price: number) {
   return `₮ ${price.toLocaleString("en-US")}`;
+}
+
+export function formatProductDiscount(product: SupabaseProduct) {
+  if (!product.price_krw || !product.current_price_krw || product.price_krw <= product.current_price_krw) return null;
+
+  const discountPercentage = ((product.price_krw - product.current_price_krw) / product.price_krw) * 100;
+  return `-${discountPercentage.toFixed(1)}%`;
 }

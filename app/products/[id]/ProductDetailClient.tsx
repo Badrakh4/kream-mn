@@ -4,12 +4,16 @@ import Link from "next/link";
 import Image from "next/image";
 import { useState } from "react";
 
-import { formatProductPrice, type SupabaseProduct } from "@/lib/supabase-products";
+import { formatProductDiscount, formatProductPrice, type SupabaseProduct } from "@/lib/supabase-products";
 
-const sizes = ["40", "41", "42", "43", "44"];
+const fallbackSizes = ["40", "41", "42", "43", "44"];
 
 export default function ProductDetailClient({ product }: { product: SupabaseProduct }) {
-  const [selectedSize, setSelectedSize] = useState("42");
+  const availableSizes = product.sizes?.length ? product.sizes : fallbackSizes.map((size) => ({ id: 0, product_id: product.id, size, price_krw: 0 }));
+  const [selectedSize, setSelectedSize] = useState(availableSizes[0]?.size ?? "");
+  const discount = formatProductDiscount(product);
+  const selectedSizeRecord = availableSizes.find((item) => item.size === selectedSize);
+  const selectedPrice = selectedSizeRecord?.price_krw && product.exchange_rate ? Math.round(selectedSizeRecord.price_krw * product.exchange_rate) : product.price;
 
   return (
     <main className="min-h-screen bg-[#050505] text-[#f5f5f0]">
@@ -18,10 +22,10 @@ export default function ProductDetailClient({ product }: { product: SupabaseProd
       <div className="mx-auto grid max-w-[1440px] gap-10 px-5 py-10 sm:px-8 md:grid-cols-[minmax(0,1.1fr)_minmax(360px,0.9fr)] md:gap-16 lg:px-12 lg:py-16">
         <div className="relative aspect-square overflow-hidden bg-gradient-to-br from-[#d6d0c7] via-[#65635f] to-[#171717]">{product.image_url?.trim() && <><Image alt="" aria-hidden="true" className="scale-110 object-cover opacity-20 blur-2xl" fill sizes="(max-width: 768px) 100vw, 60vw" src={product.image_url} /><Image alt={`${product.brand} ${product.name}`} className="object-contain p-6 sm:p-10" fill priority sizes="(max-width: 768px) 100vw, 60vw" src={product.image_url} /></>}<span className="absolute left-5 top-5 z-10 bg-[#d7ff3f] px-3 py-2 text-[10px] font-bold uppercase tracking-[0.16em] text-black">Verified item</span><span className="absolute bottom-5 right-5 z-10 text-xs font-bold uppercase tracking-[0.16em] text-white/70">KREAM / {product.id}</span></div>
 
-        <div className="flex flex-col justify-center"><p className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-[#d7ff3f]">{product.brand}</p><h1 className="max-w-xl text-4xl font-bold leading-[1.05] tracking-[-0.04em] sm:text-6xl">{product.name}</h1><div className="mt-8 border-y border-white/10 py-6"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Current price</p><p className="mt-2 text-3xl font-bold text-[#d7ff3f]">{formatProductPrice(product.price)}</p></div><p className="mt-7 max-w-xl text-sm leading-7 text-white/55">{product.description ?? "A considered KREAM.MN selection made for your everyday rotation."}</p>
+        <div className="flex flex-col justify-center"><p className="mb-4 text-xs font-semibold uppercase tracking-[0.22em] text-[#d7ff3f]">{product.brand}</p><h1 className="max-w-xl text-4xl font-bold leading-[1.05] tracking-[-0.04em] sm:text-6xl">{product.name}</h1><div className="mt-8 border-y border-white/10 py-6"><p className="text-[10px] font-semibold uppercase tracking-[0.18em] text-white/40">Current price</p><div className="mt-2 flex items-center gap-3"><p className="text-3xl font-bold text-[#d7ff3f]">{formatProductPrice(selectedPrice)}</p>{discount && <span className="bg-red-500 px-2 py-1 text-xs font-bold text-white">{discount}</span>}</div></div><p className="mt-7 max-w-xl text-sm leading-7 text-white/55">{product.description ?? "A considered KREAM.MN selection made for your everyday rotation."}</p>
 
-          <div className="mt-8"><div className="mb-3 flex items-center justify-between"><label className="text-xs font-semibold uppercase tracking-[0.16em]" htmlFor="size-options">Select size</label><span className="text-xs text-white/40">EU</span></div><div className="grid grid-cols-5 gap-2" id="size-options">{sizes.map((size) => <button key={size} type="button" aria-pressed={selectedSize === size} onClick={() => setSelectedSize(size)} className={`h-12 border text-sm font-semibold transition-colors ${selectedSize === size ? "border-[#d7ff3f] bg-[#d7ff3f] text-black" : "border-white/15 text-white/70 hover:border-white/60 hover:text-white"}`}>{size}</button>)}</div></div>
-          <Link className="mt-8 flex h-14 items-center justify-center gap-3 bg-[#d7ff3f] text-sm font-bold uppercase tracking-[0.14em] text-black transition-colors hover:bg-white" href={`/request?productId=${product.id}&productName=${encodeURIComponent(product.name)}&size=${selectedSize}&price=${product.price}`}>Order via Messenger <span aria-hidden="true">↗</span></Link><p className="mt-4 text-center text-xs text-white/35">Selected size: EU {selectedSize} · We will confirm availability in Messenger</p>
+          <div className="mt-8"><div className="mb-3 flex items-center justify-between"><label className="text-xs font-semibold uppercase tracking-[0.16em]" htmlFor="size-options">Select size</label><span className="text-xs text-white/40">EU</span></div><div className="grid grid-cols-5 gap-2" id="size-options">{availableSizes.map((item) => <button key={`${item.product_id}-${item.size}`} type="button" aria-pressed={selectedSize === item.size} onClick={() => setSelectedSize(item.size)} className={`h-12 border text-sm font-semibold transition-colors ${selectedSize === item.size ? "border-[#d7ff3f] bg-[#d7ff3f] text-black" : "border-white/15 text-white/70 hover:border-white/60 hover:text-white"}`}>{item.size}</button>)}</div><p className="mt-3 text-xs text-white/40">{selectedSizeRecord?.price_krw ? `${selectedSizeRecord.price_krw.toLocaleString("en-US")} KRW` : "Using product price"}</p></div>
+          <Link className="mt-8 flex h-14 items-center justify-center gap-3 bg-[#d7ff3f] text-sm font-bold uppercase tracking-[0.14em] text-black transition-colors hover:bg-white" href={`/request?productId=${product.id}&productName=${encodeURIComponent(product.name)}&size=${selectedSize}&price=${selectedPrice}`}>Order via Messenger <span aria-hidden="true">↗</span></Link><p className="mt-4 text-center text-xs text-white/35">Selected size: EU {selectedSize} · {formatProductPrice(selectedPrice)} · We will confirm availability in Messenger</p>
         </div>
       </div>
     </main>

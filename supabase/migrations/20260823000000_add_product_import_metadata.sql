@@ -3,6 +3,7 @@ alter table public.products
   add column if not exists source_name text,
   add column if not exists source_product_id text,
   add column if not exists price_krw integer,
+  add column if not exists current_price_krw integer,
   add column if not exists exchange_rate numeric,
   add column if not exists exchange_rate_date date,
   add column if not exists imported_at timestamptz,
@@ -18,6 +19,11 @@ alter table public.products
   drop constraint if exists products_price_krw_positive_check,
   add constraint products_price_krw_positive_check
     check (price_krw is null or price_krw > 0);
+
+alter table public.products
+  drop constraint if exists products_current_price_krw_positive_check,
+  add constraint products_current_price_krw_positive_check
+    check (current_price_krw is null or current_price_krw > 0);
 
 alter table public.products
   drop constraint if exists products_exchange_rate_positive_check,
