@@ -5,6 +5,7 @@ import { FormEvent, Suspense, useState } from "react";
 import { useSearchParams } from "next/navigation";
 
 import { supabase } from "@/lib/supabase";
+import { normalizeFacebookProfileUrl, normalizeMessengerUsername } from "@/lib/order-requests";
 
 export default function RequestPage() {
   return <Suspense fallback={<main className="min-h-screen bg-[#050505]" />}><RequestForm /></Suspense>;
@@ -29,10 +30,12 @@ function RequestForm() {
       const formData = new FormData(event.currentTarget);
       const fullname = String(formData.get("fullName") ?? "").trim();
       const phone = String(formData.get("phone") ?? "").trim();
-      const messenger = String(formData.get("messenger") ?? "").trim();
+      const facebookProfileUrl = normalizeFacebookProfileUrl(String(formData.get("facebookProfileUrl") ?? ""));
+      const messengerUsername = normalizeMessengerUsername(String(formData.get("messengerUsername") ?? ""));
+      const instagramUsername = String(formData.get("instagramUsername") ?? "").trim().replace(/^@+/, "") || null;
       const numericPrice = Number(price.replace(/[₮,\s]/g, ""));
-      if (fullname.length < 2 || !/^\+?[0-9 ()-]{7,20}$/.test(phone) || messenger.length < 2) {
-        setError("Please enter a valid name, phone number, and Messenger username.");
+      if (fullname.length < 2 || !/^\+?[0-9 ()-]{7,20}$/.test(phone)) {
+        setError("Please enter a valid name and phone number.");
         setSubmitting(false);
         return;
       }
@@ -42,19 +45,30 @@ function RequestForm() {
         return;
       }
 
-      const { error: insertError } = await supabase.from("orders").insert({
+      const { data: order, error: insertError } = await supabase.from("orders").insert({
         customer_name: fullname,
         phone,
-        messenger,
+        messenger: messengerUsername || null,
+        facebook_profile_url: facebookProfileUrl,
+        messenger_username: messengerUsername || null,
+        instagram_username: instagramUsername,
         product_name: productName,
         size: selectedSize,
         price: numericPrice,
         status: "pending",
-      });
+      }).select("id").single();
 
       if (insertError) {
         throw insertError;
       }
+
+      console.info("Facebook customer matching: order created", {
+        orderId: order?.id ?? null,
+        customerId: null,
+        facebookId: null,
+        profileUrl: null,
+        messengerThreadId: null,
+      });
 
       setSubmitted(true);
     } catch {
@@ -93,7 +107,9 @@ function RequestForm() {
             <form className="space-y-5 pt-7" onSubmit={handleSubmit}>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Full Name</span><input required name="fullName" type="text" placeholder="Your full name" className="h-14 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
               <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Phone Number</span><input required name="phone" type="tel" placeholder="+976 9900 7930" className="h-14 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
-              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Facebook Messenger username</span><input required name="messenger" type="text" placeholder="@username" className="h-14 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
+              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Facebook profile URL <span className="text-white/30">(optional)</span></span><input name="facebookProfileUrl" type="text" placeholder="facebook.com/username" className="h-14 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
+              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Messenger username <span className="text-white/30">(optional)</span></span><input name="messengerUsername" type="text" placeholder="m.me/username or username" className="h-14 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
+              <label className="block"><span className="mb-2 block text-xs font-semibold uppercase tracking-[0.14em] text-white/70">Instagram username <span className="text-white/30">(optional)</span></span><input name="instagramUsername" type="text" placeholder="@username" className="h-14 w-full border border-white/15 bg-black px-4 text-sm text-white outline-none transition-colors placeholder:text-white/30 focus:border-[#d7ff3f]" /></label>
               {error && <p className="text-sm text-red-300" role="alert">{error}</p>}
               <button className="flex h-14 w-full items-center justify-center gap-3 bg-[#d7ff3f] text-sm font-bold uppercase tracking-[0.14em] text-black transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-60" disabled={submitting} type="submit">{submitting ? "Submitting..." : "Submit Request"} <span aria-hidden="true">↗</span></button>
             </form>
